@@ -4,11 +4,6 @@ import { fetchCityDetail } from '@/lib/api';
 import { getCityBySlug } from '@/lib/utils';
 import { CITIES } from '@/lib/constants';
 import CurrentStatus from '@/components/city-detail/CurrentStatus';
-import HourlyChart from '@/components/city-detail/HourlyChart';
-import DailyTable from '@/components/city-detail/DailyTable';
-import ForecastView from '@/components/city-detail/ForecastView';
-import HistoryView from '@/components/city-detail/HistoryView';
-import PredictionSummary from '@/components/city-detail/PredictionSummary';
 import CityDetailTabs from './CityDetailTabs';
 
 interface PageProps {
@@ -57,7 +52,7 @@ export default async function CityDetailPage({ params }: PageProps) {
         forecast={detail.forecast}
         history={detail.history}
         today={today}
-        windDirection={detail.windDirection}
+        weather={detail.weather}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { DailyAirQuality } from '@/lib/types';
+import { DailyAirQuality, WeatherData, AirQualityHourly } from '@/lib/types';
 import { generatePrediction, calculateAccuracy } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
 
@@ -6,7 +6,8 @@ interface PredictionSummaryProps {
   today: DailyAirQuality | undefined;
   forecast: DailyAirQuality[];
   history: DailyAirQuality[];
-  windDirection?: number | null;
+  weather: WeatherData;
+  todayHourly: AirQualityHourly[];
 }
 
 function AccuracyRing({ value, label, size = 80 }: { value: number; label: string; size?: number }) {
@@ -52,11 +53,11 @@ function AccuracyRing({ value, label, size = 80 }: { value: number; label: strin
   );
 }
 
-export default function PredictionSummary({ today, forecast, history, windDirection }: PredictionSummaryProps) {
+export default function PredictionSummary({ today, forecast, history, weather, todayHourly }: PredictionSummaryProps) {
   const tomorrow = forecast[1];
   const dayAfter = forecast[2];
 
-  const prediction = generatePrediction(today, tomorrow, history, windDirection);
+  const prediction = generatePrediction(today, tomorrow, history, weather, todayHourly);
   const accuracy = calculateAccuracy(history, forecast);
 
   if (!prediction) {
@@ -158,6 +159,58 @@ export default function PredictionSummary({ today, forecast, history, windDirect
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Weather factors */}
+      {prediction.weatherFactors && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">기상 보정 요인</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">🌧️ 강수 효과</span>
+              <span className="font-medium">
+                {prediction.weatherFactors.precipitationFactor < 1
+                  ? `세정 효과 (-${Math.round((1 - prediction.weatherFactors.precipitationFactor) * 100)}%)`
+                  : '강수 없음'}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">🌡️ 대기 안정도</span>
+              <span className={`font-medium ${
+                prediction.weatherFactors.stabilityFactor > 1.15 ? 'text-red-500' :
+                prediction.weatherFactors.stabilityFactor < 0.85 ? 'text-blue-500' : ''
+              }`}>
+                {prediction.weatherFactors.stabilityFactor > 1.15 ? '정체 우려' :
+                 prediction.weatherFactors.stabilityFactor < 0.85 ? '분산 양호' : '보통'}
+                {' '}(×{prediction.weatherFactors.stabilityFactor})
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">💧 습도 영향</span>
+              <span className="font-medium">
+                {prediction.weatherFactors.humidityFactor > 1.1
+                  ? `입자 팽창 (+${Math.round((prediction.weatherFactors.humidityFactor - 1) * 100)}%)`
+                  : '보통'}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">🏭 오염물질 추세</span>
+              <span className={`font-medium ${
+                prediction.weatherFactors.leadingIndicatorFactor > 1.05 ? 'text-red-500' :
+                prediction.weatherFactors.leadingIndicatorFactor < 0.95 ? 'text-blue-500' : ''
+              }`}>
+                {prediction.weatherFactors.leadingIndicatorFactor > 1.1 ? '급증 신호' :
+                 prediction.weatherFactors.leadingIndicatorFactor > 1.05 ? '증가 추세' :
+                 prediction.weatherFactors.leadingIndicatorFactor < 0.95 ? '감소 추세' : '안정'}
+              </span>
+            </div>
+          </div>
+          {prediction.weatherFactors.summary !== '특별한 기상 보정 없음' && (
+            <p className="mt-3 text-xs text-gray-400 leading-relaxed">
+              기상 보정: {prediction.weatherFactors.summary}
+            </p>
+          )}
         </div>
       )}
 

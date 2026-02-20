@@ -6,6 +6,13 @@ export interface City {
   region: string;
 }
 
+/** 도시별 보정 프로파일 */
+export interface CityProfile {
+  chinaInfluence: number;   // 0-1, 중국 영향 민감도
+  basinEffect: number;      // 0-1, 분지 정체 효과
+  coastalEffect: number;    // 0-1, 해양 정화 효과
+}
+
 export type AirQualityGrade = 'good' | 'moderate' | 'bad' | 'veryBad';
 
 export type GradeLabel = '좋음' | '보통' | '나쁨' | '매우나쁨';
@@ -14,6 +21,9 @@ export interface AirQualityHourly {
   time: string;
   pm25: number | null;
   pm10: number | null;
+  no2?: number | null;
+  so2?: number | null;
+  co?: number | null;
 }
 
 export interface DailyAirQuality {
@@ -37,6 +47,19 @@ export interface CityAirQualitySummary {
   updatedAt: string;
 }
 
+/** 기상 데이터 (Weather API에서 가져옴) */
+export interface WeatherData {
+  windDirection: number | null;
+  windSpeed: number | null;
+  temperature: number | null;
+  humidity: number | null;
+  precipitation: number | null;
+  precipitationProbability: number | null;
+  pressureMsl: number | null;
+  surfacePressure: number | null;
+  cloudCover: number | null;
+}
+
 export interface CityAirQualityDetail {
   city: City;
   current: AirQualityHourly;
@@ -44,7 +67,7 @@ export interface CityAirQualityDetail {
   dailyStats: DailyAirQuality[];
   forecast: DailyAirQuality[];
   history: DailyAirQuality[];
-  windDirection: number | null;
+  weather: WeatherData;
 }
 
 export interface PredictionInfo {
@@ -59,6 +82,13 @@ export interface PredictionInfo {
     windDescription: string;
     holidayName: string | null;
     seasonalFactor: number;
+  };
+  weatherFactors?: {
+    precipitationFactor: number;
+    stabilityFactor: number;
+    humidityFactor: number;
+    leadingIndicatorFactor: number;
+    summary: string;
   };
 }
 
@@ -77,6 +107,9 @@ export interface OpenMeteoAirQualityResponse {
     time: string[];
     pm10: (number | null)[];
     pm2_5: (number | null)[];
+    nitrogen_dioxide?: (number | null)[];
+    sulphur_dioxide?: (number | null)[];
+    carbon_monoxide?: (number | null)[];
   };
   hourly_units: {
     time: string;

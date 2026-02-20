@@ -8,9 +8,11 @@ import {
   PredictionInfo,
   AccuracyInfo,
   City,
+  WeatherData,
 } from './types';
 import { PM25_THRESHOLDS, PM10_THRESHOLDS, GRADE_ORDER, CITIES } from './constants';
-import { calculateChinaFactor, type ChinaFactorResult } from './china-factor';
+import { calculateChinaFactor } from './china-factor';
+import { calculateWeatherFactor } from './weather-factor';
 
 export function getGrade(value: number | null, type: 'pm25' | 'pm10'): AirQualityGrade {
   if (value === null || value < 0) return 'good';
@@ -82,7 +84,6 @@ export function getCurrentHourData(hourly: AirQualityHourly[]): AirQualityHourly
   const match = hourly.find((h) => h.time === currentHour);
   if (match) return match;
 
-  // Fallback: find the closest past hour with data
   const past = hourly
     .filter((h) => h.time <= currentHour && (h.pm25 !== null || h.pm10 !== null))
     .sort((a, b) => b.time.localeCompare(a.time));
@@ -164,12 +165,8 @@ export function formatFullDateTime(timeStr: string): string {
   }
 }
 
-// --- Weighted Moving Average (WMA) prediction model ---
+// --- WMA Prediction Model ---
 
-/**
- * Calculate weighted moving average from an array of values.
- * More recent values get higher weights: [1, 2, 3, ..., n]
- */
 function weightedMovingAverage(values: number[]): number {
   if (values.length === 0) return 0;
   if (values.length === 1) return values[0];
@@ -177,7 +174,7 @@ function weightedMovingAverage(values: number[]): number {
   let weightedSum = 0;
   let weightTotal = 0;
   for (let i = 0; i < values.length; i++) {
-    const weight = i + 1; // older=1, newest=n
+    const weight = i + 1;
     weightedSum += values[i] * weight;
     weightTotal += weight;
   }
@@ -185,32 +182,42 @@ function weightedMovingAverage(values: number[]): number {
 }
 
 /**
- * Calculate linear trend (slope) from recent values using least squares.
- * Returns the average daily change.
+ * Theil-Sen 추정량: 모든 점 쌍의 기울기 중앙값 사용 (outlier에 강건)
  */
-function calculateTrendSlope(values: number[]): number {
+function theilSenSlope(values: number[]): number {
   if (values.length < 2) return 0;
-  const n = values.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-  for (let i = 0; i < n; i++) {
-    sumX += i;
-    sumY += values[i];
-    sumXY += i * values[i];
-    sumX2 += i * i;
+  const slopes: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    for (let j = i + 1; j < values.length; j++) {
+      slopes.push((values[j] - values[i]) / (j - i));
+    }
   }
-  const denominator = n * sumX2 - sumX * sumX;
-  if (denominator === 0) return 0;
-  return (n * sumXY - sumX * sumY) / denominator;
+  slopes.sort((a, b) => a - b);
+  // 중앙값
+  const mid = Math.floor(slopes.length / 2);
+  return slopes.length % 2 === 0
+    ? (slopes[mid - 1] + slopes[mid]) / 2
+    : slopes[mid];
 }
 
 /**
- * WMA prediction: combine weighted average with trend adjustment.
- * trendWeight controls how much the trend influences the forecast (0~1).
+ * IQR 기반 outlier clipping
  */
+function clipOutliers(values: number[]): number[] {
+  if (values.length < 4) return values;
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  const lower = q1 - 1.5 * iqr;
+  const upper = q3 + 1.5 * iqr;
+  return values.map(v => Math.max(lower, Math.min(upper, v)));
+}
+
 function wmaPredictNext(values: number[], trendWeight = 0.3): number {
-  const wma = weightedMovingAverage(values);
-  const slope = calculateTrendSlope(values);
-  // Predict next value = WMA + trend adjustment (damped)
+  const clipped = clipOutliers(values);
+  const wma = weightedMovingAverage(clipped);
+  const slope = theilSenSlope(clipped);
   const predicted = wma + slope * trendWeight;
   return Math.max(0, Math.round(predicted));
 }
@@ -219,40 +226,89 @@ export function generatePrediction(
   today: DailyAirQuality | undefined,
   tomorrow: DailyAirQuality | undefined,
   history?: DailyAirQuality[],
-  windDirection?: number | null
+  weather?: WeatherData,
+  todayHourly?: AirQualityHourly[]
 ): PredictionInfo | null {
   if (!tomorrow) return null;
 
-  // Use WMA if we have enough history, otherwise fall back to Open-Meteo forecast
   let predictedPm25 = tomorrow.pm25Avg;
   let predictedPm10 = tomorrow.pm10Avg;
 
   if (history && history.length >= 3) {
     const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date));
-    // Take up to last 5 days + today for WMA
     const recent = today ? [...sorted.slice(-4), today] : sorted.slice(-5);
 
     const pm25Values = recent.map((d) => d.pm25Avg).filter((v) => v > 0);
     const pm10Values = recent.map((d) => d.pm10Avg).filter((v) => v > 0);
 
+    // 적응형 blend ratio: 최근 오차 기반
+    let wmaRatio = 0.6; // 기본값
+
+    if (sorted.length >= 4 && tomorrow) {
+      // 최근 3일에 대해 WMA 오차 vs Open-Meteo 오차 비교
+      const testDays = sorted.slice(-3);
+      let wmaErrorSum = 0, omErrorSum = 0, testCount = 0;
+
+      for (let i = 0; i < testDays.length; i++) {
+        const dayIdx = sorted.indexOf(testDays[i]);
+        if (dayIdx < 2) continue;
+        const windowPm25 = sorted.slice(Math.max(0, dayIdx - 5), dayIdx).map(d => d.pm25Avg).filter(v => v > 0);
+        if (windowPm25.length >= 2) {
+          const wmaPred = wmaPredictNext(windowPm25, 0.3);
+          wmaErrorSum += Math.abs(wmaPred - testDays[i].pm25Avg);
+          omErrorSum += Math.abs(tomorrow.pm25Avg - testDays[i].pm25Avg);
+          testCount++;
+        }
+      }
+
+      if (testCount > 0) {
+        const avgWmaErr = wmaErrorSum / testCount + 0.01; // epsilon
+        const avgOmErr = omErrorSum / testCount + 0.01;
+        const wmaWeight = 1 / avgWmaErr;
+        const omWeight = 1 / avgOmErr;
+        wmaRatio = wmaWeight / (wmaWeight + omWeight);
+        // Clamping: [0.3, 0.8]
+        wmaRatio = Math.max(0.3, Math.min(0.8, wmaRatio));
+      }
+    }
+
     if (pm25Values.length >= 3) {
       const wmaPm25 = wmaPredictNext(pm25Values, 0.3);
-      // Blend: 60% WMA + 40% Open-Meteo forecast for best accuracy
-      predictedPm25 = Math.round(wmaPm25 * 0.6 + tomorrow.pm25Avg * 0.4);
+      predictedPm25 = Math.round(wmaPm25 * wmaRatio + tomorrow.pm25Avg * (1 - wmaRatio));
     }
     if (pm10Values.length >= 3) {
       const wmaPm10 = wmaPredictNext(pm10Values, 0.3);
-      predictedPm10 = Math.round(wmaPm10 * 0.6 + tomorrow.pm10Avg * 0.4);
+      predictedPm10 = Math.round(wmaPm10 * wmaRatio + tomorrow.pm10Avg * (1 - wmaRatio));
     }
   }
 
-  // Apply China industrial factor
+  // 1) 중국 산업 보정 (풍향+풍속 통합)
   const tomorrowDate = new Date(tomorrow.date);
-  const chinaResult = calculateChinaFactor(tomorrowDate, windDirection ?? null);
+  const chinaResult = calculateChinaFactor(
+    tomorrowDate,
+    weather?.windDirection ?? null,
+    weather?.windSpeed ?? null
+  );
 
-  // Apply the combined factor as a multiplier on the predicted values
-  predictedPm25 = Math.max(0, Math.round(predictedPm25 * chinaResult.combinedFactor));
-  predictedPm10 = Math.max(0, Math.round(predictedPm10 * chinaResult.combinedFactor));
+  // 2) 기상 보정 (강수, 안정도, 습도, 선행지표)
+  const defaultWeather: WeatherData = {
+    windDirection: null, windSpeed: null, temperature: null,
+    humidity: null, precipitation: null, precipitationProbability: null,
+    pressureMsl: null, surfacePressure: null, cloudCover: null,
+  };
+  const weatherResult = calculateWeatherFactor(
+    weather ?? defaultWeather,
+    todayHourly ?? []
+  );
+
+  // 종합 적용: china factor × weather factor
+  // 안전 범위: [0.2, 3.0]
+  const totalFactor = Math.max(0.2, Math.min(3.0,
+    chinaResult.combinedFactor * weatherResult.combinedFactor
+  ));
+
+  predictedPm25 = Math.max(0, Math.round(predictedPm25 * totalFactor));
+  predictedPm10 = Math.max(0, Math.round(predictedPm10 * totalFactor));
 
   const todayAvg = today?.pm25Avg ?? 0;
   const diff = predictedPm25 - todayAvg;
@@ -279,9 +335,12 @@ export function generatePrediction(
     message += ' 실외 활동을 자제해 주세요.';
   }
 
-  // Add China factor context to message
-  if (chinaResult.summary !== '특별한 보정 요인 없음') {
-    message += ` (보정 요인: ${chinaResult.summary})`;
+  // 보정 요인 요약 추가
+  const allFactors: string[] = [];
+  if (chinaResult.summary !== '특별한 보정 요인 없음') allFactors.push(chinaResult.summary);
+  if (weatherResult.summary !== '특별한 기상 보정 없음') allFactors.push(weatherResult.summary);
+  if (allFactors.length > 0) {
+    message += ` (보정: ${allFactors.join(' / ')})`;
   }
 
   return {
@@ -297,14 +356,21 @@ export function generatePrediction(
       holidayName: chinaResult.holidayName,
       seasonalFactor: chinaResult.seasonalFactor,
     },
+    weatherFactors: {
+      precipitationFactor: weatherResult.precipitationFactor,
+      stabilityFactor: weatherResult.stabilityFactor,
+      humidityFactor: weatherResult.humidityFactor,
+      leadingIndicatorFactor: weatherResult.leadingIndicatorFactor,
+      summary: weatherResult.summary,
+    },
   };
 }
 
-// --- Accuracy calculation using Normalized MAE back-testing ---
+// --- Accuracy calculation with time-weighted Normalized MAE ---
 
-// Typical range for normalization (based on Korean air quality scale)
-const PM25_RANGE = 75;  // 매우나쁨 기준 76 → 0~75 범위를 100%로
-const PM10_RANGE = 150; // 매우나쁨 기준 151 → 0~150 범위를 100%로
+const PM25_RANGE = 75;
+const PM10_RANGE = 150;
+const ACCURACY_DECAY = 0.85; // 시간 가중 감쇠율
 
 export function calculateAccuracy(
   history: DailyAirQuality[],
@@ -316,13 +382,10 @@ export function calculateAccuracy(
 
   const pm25Errors: number[] = [];
   const pm10Errors: number[] = [];
+  const weights: number[] = [];
   let gradeMatches = 0;
   let comparisons = 0;
 
-  // Sliding window back-test: for each day from index 2 onward,
-  // use preceding days to make a WMA prediction, then compare to actual.
-  // Error is normalized by the pollutant range, not by the actual value,
-  // so low-concentration days don't produce inflated error rates.
   for (let i = 2; i < sorted.length; i++) {
     const actual = sorted[i];
     const windowStart = Math.max(0, i - 5);
@@ -331,13 +394,15 @@ export function calculateAccuracy(
     const pm25Window = window.map((d) => d.pm25Avg).filter((v) => v >= 0);
     const pm10Window = window.map((d) => d.pm10Avg).filter((v) => v >= 0);
 
+    // 시간 가중: 최근일수록 가중치 높음
+    const dayWeight = Math.pow(ACCURACY_DECAY, sorted.length - 1 - i);
+
     if (pm25Window.length >= 2) {
       const predicted = wmaPredictNext(pm25Window, 0.3);
-      // Normalized error: absolute error / range
       const error = Math.abs(predicted - actual.pm25Avg) / PM25_RANGE;
       pm25Errors.push(error);
+      weights.push(dayWeight);
 
-      // Grade comparison
       const predictedGrade = getGrade(predicted, 'pm25');
       if (predictedGrade === actual.pm25Grade) gradeMatches++;
       comparisons++;
@@ -352,14 +417,22 @@ export function calculateAccuracy(
 
   if (pm25Errors.length === 0 && pm10Errors.length === 0) return null;
 
-  const avgPm25Error = pm25Errors.length > 0
-    ? pm25Errors.reduce((a, b) => a + b, 0) / pm25Errors.length
-    : 0;
-  const avgPm10Error = pm10Errors.length > 0
-    ? pm10Errors.reduce((a, b) => a + b, 0) / pm10Errors.length
-    : 0;
+  // 가중 평균 오차 계산
+  const weightedAvg = (errors: number[], wts: number[]): number => {
+    if (errors.length === 0) return 0;
+    let sumWeightedError = 0;
+    let sumWeights = 0;
+    for (let i = 0; i < errors.length; i++) {
+      const w = i < wts.length ? wts[i] : 1;
+      sumWeightedError += errors[i] * w;
+      sumWeights += w;
+    }
+    return sumWeights > 0 ? sumWeightedError / sumWeights : 0;
+  };
 
-  // Convert normalized error to accuracy percentage
+  const avgPm25Error = weightedAvg(pm25Errors, weights);
+  const avgPm10Error = weightedAvg(pm10Errors, weights);
+
   const pm25Accuracy = Math.round(Math.max(0, Math.min(100, (1 - avgPm25Error) * 100)));
   const pm10Accuracy = Math.round(Math.max(0, Math.min(100, (1 - avgPm10Error) * 100)));
   const overallAccuracy = Math.round((pm25Accuracy + pm10Accuracy) / 2);

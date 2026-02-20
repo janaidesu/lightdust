@@ -1,4 +1,4 @@
-import { City } from './types';
+import { City, CityProfile } from './types';
 
 export const CITIES: City[] = [
   { name: '서울', slug: 'seoul', lat: 37.5665, lon: 126.978, region: '수도권' },
@@ -35,3 +35,17 @@ export const GRADE_ORDER: Record<string, number> = {
 };
 
 export const REGIONS = ['전체', '수도권', '영남권', '호남권', '충청권', '제주'];
+
+/** 도시별 보정 프로파일 */
+export const CITY_PROFILES: Record<string, CityProfile> = {
+  seoul:   { chinaInfluence: 0.9,  basinEffect: 0.3, coastalEffect: 0.0 },
+  busan:   { chinaInfluence: 0.4,  basinEffect: 0.2, coastalEffect: 0.6 },
+  daegu:   { chinaInfluence: 0.5,  basinEffect: 0.7, coastalEffect: 0.0 },
+  incheon: { chinaInfluence: 0.95, basinEffect: 0.1, coastalEffect: 0.4 },
+  gwangju: { chinaInfluence: 0.7,  basinEffect: 0.3, coastalEffect: 0.1 },
+  daejeon: { chinaInfluence: 0.6,  basinEffect: 0.4, coastalEffect: 0.0 },
+  ulsan:   { chinaInfluence: 0.35, basinEffect: 0.2, coastalEffect: 0.5 },
+  sejong:  { chinaInfluence: 0.6,  basinEffect: 0.3, coastalEffect: 0.0 },
+  suwon:   { chinaInfluence: 0.85, basinEffect: 0.2, coastalEffect: 0.0 },
+  jeju:    { chinaInfluence: 0.6,  basinEffect: 0.0, coastalEffect: 0.7 },
+};

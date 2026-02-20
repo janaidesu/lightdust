@@ -1,6 +1,6 @@
 'use client';
 
-import { AirQualityHourly, DailyAirQuality } from '@/lib/types';
+import { AirQualityHourly, DailyAirQuality, WeatherData } from '@/lib/types';
 import TabGroup from '@/components/ui/TabGroup';
 import HourlyChart from '@/components/city-detail/HourlyChart';
 import DailyTable from '@/components/city-detail/DailyTable';
@@ -15,7 +15,7 @@ interface CityDetailTabsProps {
   forecast: DailyAirQuality[];
   history: DailyAirQuality[];
   today: DailyAirQuality | undefined;
-  windDirection?: number | null;
+  weather: WeatherData;
 }
 
 const TABS = [
@@ -33,7 +33,7 @@ export default function CityDetailTabs({
   forecast,
   history,
   today,
-  windDirection,
+  weather,
 }: CityDetailTabsProps) {
   return (
     <TabGroup tabs={TABS}>
@@ -48,7 +48,15 @@ export default function CityDetailTabs({
           case 'history':
             return <HistoryView slug={slug} initialData={history} />;
           case 'prediction':
-            return <PredictionSummary today={today} forecast={forecast} history={history} windDirection={windDirection} />;
+            return (
+              <PredictionSummary
+                today={today}
+                forecast={forecast}
+                history={history}
+                weather={weather}
+                todayHourly={todayHourly}
+              />
+            );
           default:
             return null;
         }
