@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+@theme {
+  --color-grade-good: #3B82F6;
+  --color-grade-moderate: #22C55E;
+  --color-grade-bad: #EAB308;
+  --color-grade-very-bad: #DC2626;
+
+  --color-grade-good-bg: #EFF6FF;
+  --color-grade-moderate-bg: #F0FDF4;
+  --color-grade-bad-bg: #FEFCE8;
+  --color-grade-very-bad-bg: #FEF2F2;
+}
+
+body {
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo',
+    'Noto Sans KR', 'Malgun Gothic', 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', sans-serif;
+}
