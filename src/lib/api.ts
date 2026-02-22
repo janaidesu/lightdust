@@ -5,6 +5,7 @@ import {
   AirQualityHourly,
   DailyAirQuality,
   WeatherData,
+  VisualFactorResult,
 } from './types';
 import { CITIES } from './constants';
 import {
@@ -15,6 +16,9 @@ import {
   calculateDailyStats,
 } from './utils';
 import { format } from 'date-fns';
+import { getCCTVStationsForCity } from './cctv-stations';
+import { generateMockAnalysis } from './visual-analysis';
+import { calculateVisualFactor } from './visual-factor';
 
 const BASE_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 const WEATHER_BASE_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -171,6 +175,25 @@ export async function fetchCityDetail(slug: string): Promise<CityAirQualityDetai
     history,
     weather,
   };
+}
+
+/**
+ * CCTV 시각 분석: 도시의 CCTV 카메라 이미지를 분석하여 시각 보정 계수를 반환합니다.
+ * 현재 mock 모드만 지원 (API 키 미설정 시).
+ */
+export async function fetchCCTVAnalysis(
+  slug: string,
+  currentPm25: number | null = null,
+): Promise<VisualFactorResult | null> {
+  const stations = getCCTVStationsForCity(slug);
+  if (stations.length === 0) return null;
+
+  // Mock 모드: 현재 PM2.5 기반 모의 분석 생성
+  const analyses = stations.map(station =>
+    generateMockAnalysis(station, currentPm25)
+  );
+
+  return calculateVisualFactor(analyses);
 }
 
 export async function fetchCityHistory(

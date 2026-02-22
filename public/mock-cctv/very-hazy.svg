@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#6B7280;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#6B7280;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="url(#bg)"/>
+  <text x="320" y="200" text-anchor="middle" fill="#d1d5db" font-size="24" font-family="sans-serif" font-weight="bold">CCTV Mock</text>
+  <text x="320" y="240" text-anchor="middle" fill="#d1d5db" font-size="18" font-family="sans-serif">매우나쁨 - 심한 안개</text>
+  <text x="320" y="280" text-anchor="middle" fill="#d1d5db" font-size="14" font-family="sans-serif" opacity="0.7">API 연동 시 실제 CCTV 스냅샷으로 대체됩니다</text>
+  <rect x="10" y="10" width="100" height="25" rx="4" fill="red" opacity="0.8"/>
+  <text x="60" y="28" text-anchor="middle" fill="white" font-size="14" font-family="sans-serif" font-weight="bold">LIVE</text>
+  <text x="630" y="470" text-anchor="end" fill="#d1d5db" font-size="12" font-family="monospace" opacity="0.5">2026-02-22 14:00 KST</text>
+</svg>

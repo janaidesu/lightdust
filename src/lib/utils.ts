@@ -9,10 +9,12 @@ import {
   AccuracyInfo,
   City,
   WeatherData,
+  VisualAnalysisResult,
 } from './types';
 import { PM25_THRESHOLDS, PM10_THRESHOLDS, GRADE_ORDER, CITIES } from './constants';
 import { calculateChinaFactor } from './china-factor';
 import { calculateWeatherFactor } from './weather-factor';
+import { calculateVisualFactor } from './visual-factor';
 
 export function getGrade(value: number | null, type: 'pm25' | 'pm10'): AirQualityGrade {
   if (value === null || value < 0) return 'good';
@@ -227,7 +229,8 @@ export function generatePrediction(
   tomorrow: DailyAirQuality | undefined,
   history?: DailyAirQuality[],
   weather?: WeatherData,
-  todayHourly?: AirQualityHourly[]
+  todayHourly?: AirQualityHourly[],
+  visualAnalyses?: VisualAnalysisResult[],
 ): PredictionInfo | null {
   if (!tomorrow) return null;
 
@@ -301,10 +304,17 @@ export function generatePrediction(
     todayHourly ?? []
   );
 
-  // 종합 적용: china factor × weather factor
+  // 3) CCTV 시각 보정 (선택적)
+  const visualResult = visualAnalyses && visualAnalyses.length > 0
+    ? calculateVisualFactor(visualAnalyses)
+    : null;
+
+  // 종합 적용: china factor × weather factor × visual factor
   // 안전 범위: [0.2, 3.0]
   const totalFactor = Math.max(0.2, Math.min(3.0,
-    chinaResult.combinedFactor * weatherResult.combinedFactor
+    chinaResult.combinedFactor *
+    weatherResult.combinedFactor *
+    (visualResult?.combinedFactor ?? 1.0)
   ));
 
   predictedPm25 = Math.max(0, Math.round(predictedPm25 * totalFactor));
@@ -339,6 +349,7 @@ export function generatePrediction(
   const allFactors: string[] = [];
   if (chinaResult.summary !== '특별한 보정 요인 없음') allFactors.push(chinaResult.summary);
   if (weatherResult.summary !== '특별한 기상 보정 없음') allFactors.push(weatherResult.summary);
+  if (visualResult && visualResult.summary !== 'CCTV 분석 데이터 없음') allFactors.push(visualResult.summary);
   if (allFactors.length > 0) {
     message += ` (보정: ${allFactors.join(' / ')})`;
   }
@@ -363,6 +374,12 @@ export function generatePrediction(
       leadingIndicatorFactor: weatherResult.leadingIndicatorFactor,
       summary: weatherResult.summary,
     },
+    visualFactor: visualResult ? {
+      combinedFactor: visualResult.combinedFactor,
+      haziness: visualResult.haziness,
+      cameraCount: visualResult.cameraCount,
+      summary: visualResult.summary,
+    } : undefined,
   };
 }
 

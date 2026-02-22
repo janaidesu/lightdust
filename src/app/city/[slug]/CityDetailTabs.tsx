@@ -1,12 +1,15 @@
 'use client';
 
-import { AirQualityHourly, DailyAirQuality, WeatherData } from '@/lib/types';
+import { useMemo } from 'react';
+import { AirQualityHourly, DailyAirQuality, WeatherData, VisualFactorResult } from '@/lib/types';
+import { hasCCTVSupport } from '@/lib/cctv-stations';
 import TabGroup from '@/components/ui/TabGroup';
 import HourlyChart from '@/components/city-detail/HourlyChart';
 import DailyTable from '@/components/city-detail/DailyTable';
 import ForecastView from '@/components/city-detail/ForecastView';
 import HistoryView from '@/components/city-detail/HistoryView';
 import PredictionSummary from '@/components/city-detail/PredictionSummary';
+import CCTVAnalysisView from '@/components/city-detail/CCTVAnalysisView';
 
 interface CityDetailTabsProps {
   slug: string;
@@ -16,9 +19,10 @@ interface CityDetailTabsProps {
   history: DailyAirQuality[];
   today: DailyAirQuality | undefined;
   weather: WeatherData;
+  visualAnalysis?: VisualFactorResult | null;
 }
 
-const TABS = [
+const BASE_TABS = [
   { id: 'hourly', label: '시간별' },
   { id: 'daily', label: '날짜별' },
   { id: 'forecast', label: '7일 예보' },
@@ -34,9 +38,17 @@ export default function CityDetailTabs({
   history,
   today,
   weather,
+  visualAnalysis,
 }: CityDetailTabsProps) {
+  const tabs = useMemo(() => {
+    if (hasCCTVSupport(slug)) {
+      return [...BASE_TABS, { id: 'cctv', label: 'CCTV 분석' }];
+    }
+    return BASE_TABS;
+  }, [slug]);
+
   return (
-    <TabGroup tabs={TABS}>
+    <TabGroup tabs={tabs}>
       {(activeTab) => {
         switch (activeTab) {
           case 'hourly':
@@ -55,6 +67,14 @@ export default function CityDetailTabs({
                 history={history}
                 weather={weather}
                 todayHourly={todayHourly}
+                visualAnalysis={visualAnalysis}
+              />
+            );
+          case 'cctv':
+            return (
+              <CCTVAnalysisView
+                slug={slug}
+                visualAnalysis={visualAnalysis ?? null}
               />
             );
           default:

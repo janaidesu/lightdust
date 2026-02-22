@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { fetchCityDetail } from '@/lib/api';
+import { fetchCityDetail, fetchCCTVAnalysis } from '@/lib/api';
 import { getCityBySlug } from '@/lib/utils';
 import { CITIES } from '@/lib/constants';
+import { hasCCTVSupport } from '@/lib/cctv-stations';
 import CurrentStatus from '@/components/city-detail/CurrentStatus';
 import CityDetailTabs from './CityDetailTabs';
 
@@ -26,7 +27,12 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function CityDetailPage({ params }: PageProps) {
   const { slug } = await params;
-  const detail = await fetchCityDetail(slug);
+
+  // Air Quality + CCTV 분석 병렬 호출
+  const [detail, cctvAnalysis] = await Promise.all([
+    fetchCityDetail(slug),
+    hasCCTVSupport(slug) ? fetchCCTVAnalysis(slug) : Promise.resolve(null),
+  ]);
 
   if (!detail) notFound();
 
@@ -53,6 +59,7 @@ export default async function CityDetailPage({ params }: PageProps) {
         history={detail.history}
         today={today}
         weather={detail.weather}
+        visualAnalysis={cctvAnalysis}
       />
     </div>
   );

@@ -1,6 +1,7 @@
-import { DailyAirQuality, WeatherData, AirQualityHourly } from '@/lib/types';
+import { DailyAirQuality, WeatherData, AirQualityHourly, VisualFactorResult } from '@/lib/types';
 import { generatePrediction, calculateAccuracy } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
+import HazinessMeter from './HazinessMeter';
 
 interface PredictionSummaryProps {
   today: DailyAirQuality | undefined;
@@ -8,6 +9,7 @@ interface PredictionSummaryProps {
   history: DailyAirQuality[];
   weather: WeatherData;
   todayHourly: AirQualityHourly[];
+  visualAnalysis?: VisualFactorResult | null;
 }
 
 function AccuracyRing({ value, label, size = 80 }: { value: number; label: string; size?: number }) {
@@ -53,11 +55,13 @@ function AccuracyRing({ value, label, size = 80 }: { value: number; label: strin
   );
 }
 
-export default function PredictionSummary({ today, forecast, history, weather, todayHourly }: PredictionSummaryProps) {
+export default function PredictionSummary({ today, forecast, history, weather, todayHourly, visualAnalysis }: PredictionSummaryProps) {
   const tomorrow = forecast[1];
   const dayAfter = forecast[2];
 
-  const prediction = generatePrediction(today, tomorrow, history, weather, todayHourly);
+  // visual analyses를 generatePrediction에 전달
+  const visualAnalyses = visualAnalysis?.analyses;
+  const prediction = generatePrediction(today, tomorrow, history, weather, todayHourly, visualAnalyses);
   const accuracy = calculateAccuracy(history, forecast);
 
   if (!prediction) {
@@ -168,7 +172,7 @@ export default function PredictionSummary({ today, forecast, history, weather, t
           <h3 className="text-sm font-medium text-gray-500 mb-3">기상 보정 요인</h3>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 rounded-lg p-3">
-              <span className="text-gray-500 text-xs block mb-1">🌧️ 강수 효과</span>
+              <span className="text-gray-500 text-xs block mb-1">강수 효과</span>
               <span className="font-medium">
                 {prediction.weatherFactors.precipitationFactor < 1
                   ? `세정 효과 (-${Math.round((1 - prediction.weatherFactors.precipitationFactor) * 100)}%)`
@@ -176,18 +180,18 @@ export default function PredictionSummary({ today, forecast, history, weather, t
               </span>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <span className="text-gray-500 text-xs block mb-1">🌡️ 대기 안정도</span>
+              <span className="text-gray-500 text-xs block mb-1">대기 안정도</span>
               <span className={`font-medium ${
                 prediction.weatherFactors.stabilityFactor > 1.15 ? 'text-red-500' :
                 prediction.weatherFactors.stabilityFactor < 0.85 ? 'text-blue-500' : ''
               }`}>
                 {prediction.weatherFactors.stabilityFactor > 1.15 ? '정체 우려' :
                  prediction.weatherFactors.stabilityFactor < 0.85 ? '분산 양호' : '보통'}
-                {' '}(×{prediction.weatherFactors.stabilityFactor})
+                {' '}(x{prediction.weatherFactors.stabilityFactor})
               </span>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <span className="text-gray-500 text-xs block mb-1">💧 습도 영향</span>
+              <span className="text-gray-500 text-xs block mb-1">습도 영향</span>
               <span className="font-medium">
                 {prediction.weatherFactors.humidityFactor > 1.1
                   ? `입자 팽창 (+${Math.round((prediction.weatherFactors.humidityFactor - 1) * 100)}%)`
@@ -195,7 +199,7 @@ export default function PredictionSummary({ today, forecast, history, weather, t
               </span>
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
-              <span className="text-gray-500 text-xs block mb-1">🏭 오염물질 추세</span>
+              <span className="text-gray-500 text-xs block mb-1">오염물질 추세</span>
               <span className={`font-medium ${
                 prediction.weatherFactors.leadingIndicatorFactor > 1.05 ? 'text-red-500' :
                 prediction.weatherFactors.leadingIndicatorFactor < 0.95 ? 'text-blue-500' : ''
@@ -211,6 +215,31 @@ export default function PredictionSummary({ today, forecast, history, weather, t
               기상 보정: {prediction.weatherFactors.summary}
             </p>
           )}
+        </div>
+      )}
+
+      {/* CCTV Visual factor */}
+      {prediction.visualFactor && prediction.visualFactor.cameraCount > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-3">CCTV 시각 분석</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">시야 흐림도</span>
+              <HazinessMeter value={prediction.visualFactor.haziness} />
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <span className="text-gray-500 text-xs block mb-1">보정 계수</span>
+              <span className={`text-lg font-bold ${
+                prediction.visualFactor.combinedFactor > 1.05 ? 'text-red-500' :
+                prediction.visualFactor.combinedFactor < 0.95 ? 'text-blue-500' : 'text-gray-700'
+              }`}>
+                {prediction.visualFactor.combinedFactor > 1 ? '+' : ''}{Math.round((prediction.visualFactor.combinedFactor - 1) * 100)}%
+              </span>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-gray-400">
+            {prediction.visualFactor.cameraCount}개 카메라 분석 기반 - {prediction.visualFactor.summary}
+          </p>
         </div>
       )}
 

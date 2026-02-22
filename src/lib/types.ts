@@ -70,6 +70,49 @@ export interface CityAirQualityDetail {
   weather: WeatherData;
 }
 
+/** CCTV 카메라 정보 */
+export interface CCTVStation {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  streamUrl: string;
+  snapshotUrl?: string;
+  source: 'its' | 'topis' | 'mock';
+  roadName?: string;
+}
+
+/** 이미지 분석 메트릭 */
+export interface VisualMetrics {
+  contrast: number;              // 0-1, RMS 대비
+  edgeDensity: number;           // 0-1, 에지 픽셀 비율
+  colorShift: number;            // 0-1, 블루-그레이 편향
+  brightness: number;            // 0-255, 평균 휘도
+  brightnessUniformity: number;  // 0-1, 휘도 균일도 (높을수록 흐림)
+  haziness: number;              // 0-1, 종합 흐림도
+}
+
+/** CCTV 개별 분석 결과 */
+export interface VisualAnalysisResult {
+  cctvId: string;
+  cctvName: string;
+  timestamp: string;
+  snapshotUrl: string;
+  metrics: VisualMetrics;
+  visibilityGrade: AirQualityGrade;
+  estimatedPm25Range: { min: number; max: number };
+  confidence: number;            // 0-1
+}
+
+/** 시각 보정 계수 종합 결과 */
+export interface VisualFactorResult {
+  combinedFactor: number;
+  haziness: number;
+  cameraCount: number;
+  summary: string;
+  analyses: VisualAnalysisResult[];
+}
+
 export interface PredictionInfo {
   tomorrowGrade: AirQualityGrade;
   trend: 'improving' | 'stable' | 'worsening';
@@ -88,6 +131,12 @@ export interface PredictionInfo {
     stabilityFactor: number;
     humidityFactor: number;
     leadingIndicatorFactor: number;
+    summary: string;
+  };
+  visualFactor?: {
+    combinedFactor: number;
+    haziness: number;
+    cameraCount: number;
     summary: string;
   };
 }
