@@ -4,8 +4,16 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        protocol: 'https',
+        hostname: '*.its.go.kr',
+      },
+      {
         protocol: 'http',
         hostname: '*.its.go.kr',
+      },
+      {
+        protocol: 'https',
+        hostname: 'topis.seoul.go.kr',
       },
       {
         protocol: 'http',
@@ -13,6 +21,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  headers: async () => [
+    {
+      source: '/(.*)',
+      headers: [
+        { key: 'X-DNS-Prefetch-Control', value: 'on' },
+      ],
+    },
+  ],
 };
 
 export default nextConfig;
