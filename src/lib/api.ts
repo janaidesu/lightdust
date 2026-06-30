@@ -98,7 +98,10 @@ async function fetchCurrentWeather(lat: number, lon: number): Promise<WeatherDat
   try {
     const url = `${WEATHER_BASE_URL}?latitude=${lat}&longitude=${lon}&hourly=${WEATHER_PARAMS}&timezone=Asia/Seoul&forecast_days=2&past_days=0`;
     const res = await fetch(url, { next: { revalidate: 1800 } });
-    if (!res.ok) return defaultWeather;
+    if (!res.ok) {
+      console.error(`[Weather] API error: ${res.status} ${res.statusText}`);
+      return defaultWeather;
+    }
 
     const data = await res.json();
     const times: string[] = data.hourly?.time ?? [];
@@ -131,7 +134,8 @@ async function fetchCurrentWeather(lat: number, lon: number): Promise<WeatherDat
       surfacePressure: h.surface_pressure?.[idx] ?? null,
       cloudCover: h.cloud_cover?.[idx] ?? null,
     };
-  } catch {
+  } catch (error) {
+    console.error('[Weather] Failed to fetch weather data:', error);
     return defaultWeather;
   }
 }

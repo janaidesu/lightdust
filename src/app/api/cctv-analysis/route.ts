@@ -18,18 +18,26 @@ export async function GET(request: Request) {
   const currentPm25Str = searchParams.get('pm25');
   const currentPm25 = currentPm25Str ? parseFloat(currentPm25Str) : null;
 
-  const result = await fetchCCTVAnalysis(slug, currentPm25);
+  try {
+    const result = await fetchCCTVAnalysis(slug, currentPm25);
 
-  if (!result) {
-    return NextResponse.json({ error: '해당 도시는 CCTV 분석을 지원하지 않습니다.' }, { status: 404 });
-  }
-
-  return NextResponse.json(
-    { city, ...result },
-    {
-      headers: {
-        'Cache-Control': 'public, max-age=600, s-maxage=600',
-      },
+    if (!result) {
+      return NextResponse.json({ error: '해당 도시는 CCTV 분석을 지원하지 않습니다.' }, { status: 404 });
     }
-  );
+
+    return NextResponse.json(
+      { city, ...result },
+      {
+        headers: {
+          'Cache-Control': 'public, max-age=600, s-maxage=600',
+        },
+      }
+    );
+  } catch (error) {
+    console.error('[CCTV API] Analysis failed:', error);
+    return NextResponse.json(
+      { error: 'CCTV 분석 처리 중 오류가 발생했습니다.' },
+      { status: 500 }
+    );
+  }
 }
