@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
+    console.error('[Air Quality API] Failed to fetch data:', error);
     return NextResponse.json(
       { error: 'Failed to fetch air quality data' },
       { status: 500 }

@@ -29,10 +29,17 @@ export default async function CityDetailPage({ params }: PageProps) {
   const { slug } = await params;
 
   // Air Quality + CCTV 분석 병렬 호출
-  const [detail, cctvAnalysis] = await Promise.all([
+  // CCTV is supplementary — its failure should not take down the page
+  const [detailResult, cctvResult] = await Promise.allSettled([
     fetchCityDetail(slug),
     hasCCTVSupport(slug) ? fetchCCTVAnalysis(slug) : Promise.resolve(null),
   ]);
+
+  const detail = detailResult.status === 'fulfilled' ? detailResult.value : null;
+  const cctvAnalysis = cctvResult.status === 'fulfilled' ? cctvResult.value : null;
+  if (cctvResult.status === 'rejected') {
+    console.error('[CCTV] Analysis failed for', slug, cctvResult.reason);
+  }
 
   if (!detail) notFound();
 
