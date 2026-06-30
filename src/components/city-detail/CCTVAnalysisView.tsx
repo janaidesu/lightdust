@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { VisualFactorResult, VisualAnalysisResult } from '@/lib/types';
+import { formatFactorPercent, getFactorColorClass } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
+import EmptyState from '@/components/ui/EmptyState';
 import HazinessMeter from './HazinessMeter';
 
 interface CCTVAnalysisViewProps {
@@ -58,11 +60,7 @@ export default function CCTVAnalysisView({ slug, visualAnalysis }: CCTVAnalysisV
   const [selectedIdx, setSelectedIdx] = useState(0);
 
   if (!visualAnalysis || visualAnalysis.analyses.length === 0) {
-    return (
-      <div className="text-center text-gray-400 py-12">
-        CCTV 분석 데이터가 없습니다.
-      </div>
-    );
+    return <EmptyState message="CCTV 분석 데이터가 없습니다." />;
   }
 
   const { analyses } = visualAnalysis;
@@ -83,11 +81,8 @@ export default function CCTVAnalysisView({ slug, visualAnalysis }: CCTVAnalysisV
             <div className="text-xs text-gray-500">분석 카메라</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold ${
-              visualAnalysis.combinedFactor > 1.05 ? 'text-red-500' :
-              visualAnalysis.combinedFactor < 0.95 ? 'text-blue-500' : 'text-gray-700'
-            }`}>
-              {visualAnalysis.combinedFactor > 1 ? '+' : ''}{Math.round((visualAnalysis.combinedFactor - 1) * 100)}%
+            <div className={`text-2xl font-bold ${getFactorColorClass(visualAnalysis.combinedFactor)}`}>
+              {formatFactorPercent(visualAnalysis.combinedFactor)}
             </div>
             <div className="text-xs text-gray-500">보정 계수</div>
           </div>

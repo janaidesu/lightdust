@@ -13,15 +13,12 @@
  */
 
 import type { AirQualityGrade, VisualMetrics, VisualAnalysisResult, CCTVStation } from './types';
+import { round2, clamp } from './utils';
 
 export interface AnalysisInput {
   pixels: Uint8Array;  // RGBA 픽셀 버퍼
   width: number;
   height: number;
-}
-
-function round2(v: number): number {
-  return Math.round(v * 100) / 100;
 }
 
 /** 픽셀 데이터에서 5가지 시각 메트릭을 추출 */
@@ -46,7 +43,7 @@ export function analyzeImageMetrics(input: AnalysisInput): VisualMetrics {
   for (let i = 0; i < totalPixels; i++) {
     varianceSum += (luminances[i] - brightness) ** 2;
   }
-  const contrast = Math.min(1, Math.sqrt(varianceSum / totalPixels) / 128);
+  const contrast = clamp(Math.sqrt(varianceSum / totalPixels) / 128, 0, 1);
 
   // 3. Brightness Uniformity: 1 - contrast
   const brightnessUniformity = 1 - contrast;
@@ -61,7 +58,7 @@ export function analyzeImageMetrics(input: AnalysisInput): VisualMetrics {
       blueShiftSum += Math.max(0, (b - rgAvg)) / rgAvg;
     }
   }
-  const colorShift = Math.min(1, blueShiftSum / totalPixels * 5);
+  const colorShift = clamp(blueShiftSum / totalPixels * 5, 0, 1);
 
   // 5. Edge Density: 간략 Sobel (성능을 위해 2픽셀 단위 샘플링)
   let edgeCount = 0;
@@ -76,15 +73,16 @@ export function analyzeImageMetrics(input: AnalysisInput): VisualMetrics {
     }
   }
   const sampledPixels = Math.ceil((height - 2) / step) * Math.ceil((width - 2) / step);
-  const edgeDensity = Math.min(1, edgeCount / (sampledPixels || 1));
+  const edgeDensity = clamp(edgeCount / (sampledPixels || 1), 0, 1);
 
   // 6. 종합 흐림도: 가중 합성
-  const haziness = Math.min(1, Math.max(0,
+  const haziness = clamp(
     (1 - contrast) * 0.30 +
     (1 - edgeDensity) * 0.30 +
     colorShift * 0.20 +
-    brightnessUniformity * 0.20
-  ));
+    brightnessUniformity * 0.20,
+    0, 1
+  );
 
   return {
     contrast: round2(contrast),
@@ -137,7 +135,7 @@ export function generateMockAnalysis(
   else if (basePm < 35) mockHaziness = 0.35 + jitter;
   else if (basePm < 75) mockHaziness = 0.55 + jitter;
   else mockHaziness = 0.75 + jitter;
-  mockHaziness = Math.max(0, Math.min(1, mockHaziness));
+  mockHaziness = clamp(mockHaziness, 0, 1);
 
   const imageMap = ['clear', 'moderate', 'hazy', 'very-hazy'];
   const imageIndex = mockHaziness < 0.3 ? 0 : mockHaziness < 0.5 ? 1 : mockHaziness < 0.7 ? 2 : 3;

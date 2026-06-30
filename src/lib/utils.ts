@@ -16,6 +16,14 @@ import { calculateChinaFactor } from './china-factor';
 import { calculateWeatherFactor } from './weather-factor';
 import { calculateVisualFactor } from './visual-factor';
 
+export function round2(v: number): number {
+  return Math.round(v * 100) / 100;
+}
+
+export function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 export function getGrade(value: number | null, type: 'pm25' | 'pm10'): AirQualityGrade {
   if (value === null || value < 0) return 'good';
   const thresholds = type === 'pm25' ? PM25_THRESHOLDS : PM10_THRESHOLDS;
@@ -294,13 +302,8 @@ export function generatePrediction(
   );
 
   // 2) 기상 보정 (강수, 안정도, 습도, 선행지표)
-  const defaultWeather: WeatherData = {
-    windDirection: null, windSpeed: null, temperature: null,
-    humidity: null, precipitation: null, precipitationProbability: null,
-    pressureMsl: null, surfacePressure: null, cloudCover: null,
-  };
   const weatherResult = calculateWeatherFactor(
-    weather ?? defaultWeather,
+    weather ?? DEFAULT_WEATHER,
     todayHourly ?? []
   );
 
@@ -311,11 +314,12 @@ export function generatePrediction(
 
   // 종합 적용: china factor × weather factor × visual factor
   // 안전 범위: [0.2, 3.0]
-  const totalFactor = Math.max(0.2, Math.min(3.0,
+  const totalFactor = clamp(
     chinaResult.combinedFactor *
     weatherResult.combinedFactor *
-    (visualResult?.combinedFactor ?? 1.0)
-  ));
+    (visualResult?.combinedFactor ?? 1.0),
+    0.2, 3.0
+  );
 
   predictedPm25 = Math.max(0, Math.round(predictedPm25 * totalFactor));
   predictedPm10 = Math.max(0, Math.round(predictedPm10 * totalFactor));
@@ -450,8 +454,8 @@ export function calculateAccuracy(
   const avgPm25Error = weightedAvg(pm25Errors, weights);
   const avgPm10Error = weightedAvg(pm10Errors, weights);
 
-  const pm25Accuracy = Math.round(Math.max(0, Math.min(100, (1 - avgPm25Error) * 100)));
-  const pm10Accuracy = Math.round(Math.max(0, Math.min(100, (1 - avgPm10Error) * 100)));
+  const pm25Accuracy = Math.round(clamp((1 - avgPm25Error) * 100, 0, 100));
+  const pm10Accuracy = Math.round(clamp((1 - avgPm10Error) * 100, 0, 100));
   const overallAccuracy = Math.round((pm25Accuracy + pm10Accuracy) / 2);
   const gradeMatchRate = comparisons > 0 ? Math.round((gradeMatches / comparisons) * 100) : 0;
 
@@ -470,4 +474,30 @@ export function getCityBySlug(slug: string): City | undefined {
 
 export function displayValue(value: number | null): string {
   return value !== null ? Math.round(value).toString() : '--';
+}
+
+export const DEFAULT_WEATHER: WeatherData = {
+  windDirection: null,
+  windSpeed: null,
+  temperature: null,
+  humidity: null,
+  precipitation: null,
+  precipitationProbability: null,
+  pressureMsl: null,
+  surfacePressure: null,
+  cloudCover: null,
+};
+
+export function formatFactorPercent(factor: number): string {
+  return `${factor > 1 ? '+' : ''}${Math.round((factor - 1) * 100)}%`;
+}
+
+export function getFactorColorClass(factor: number, thresholdHigh = 1.05, thresholdLow = 0.95): string {
+  if (factor > thresholdHigh) return 'text-red-500';
+  if (factor < thresholdLow) return 'text-blue-500';
+  return 'text-gray-700';
+}
+
+export function buildFactorSummary(factors: string[], defaultMessage: string): string {
+  return factors.length > 0 ? factors.join(', ') : defaultMessage;
 }

@@ -14,6 +14,8 @@ import {
   getCurrentHourData,
   groupByDate,
   calculateDailyStats,
+  getCityBySlug,
+  DEFAULT_WEATHER,
 } from './utils';
 import { format } from 'date-fns';
 import { getCCTVStationsForCity } from './cctv-stations';
@@ -83,22 +85,10 @@ export async function fetchAllCitiesCurrent(): Promise<CityAirQualitySummary[]> 
  * 풍향, 풍속, 기온, 습도, 강수, 기압, 운량을 한 번에 요청합니다.
  */
 async function fetchCurrentWeather(lat: number, lon: number): Promise<WeatherData> {
-  const defaultWeather: WeatherData = {
-    windDirection: null,
-    windSpeed: null,
-    temperature: null,
-    humidity: null,
-    precipitation: null,
-    precipitationProbability: null,
-    pressureMsl: null,
-    surfacePressure: null,
-    cloudCover: null,
-  };
-
   try {
     const url = `${WEATHER_BASE_URL}?latitude=${lat}&longitude=${lon}&hourly=${WEATHER_PARAMS}&timezone=Asia/Seoul&forecast_days=2&past_days=0`;
     const res = await fetch(url, { next: { revalidate: 1800 } });
-    if (!res.ok) return defaultWeather;
+    if (!res.ok) return DEFAULT_WEATHER;
 
     const data = await res.json();
     const times: string[] = data.hourly?.time ?? [];
@@ -117,7 +107,7 @@ async function fetchCurrentWeather(lat: number, lon: number): Promise<WeatherDat
       }
     }
 
-    if (idx === -1) return defaultWeather;
+    if (idx === -1) return DEFAULT_WEATHER;
 
     const h = data.hourly;
     return {
@@ -132,12 +122,12 @@ async function fetchCurrentWeather(lat: number, lon: number): Promise<WeatherDat
       cloudCover: h.cloud_cover?.[idx] ?? null,
     };
   } catch {
-    return defaultWeather;
+    return DEFAULT_WEATHER;
   }
 }
 
 export async function fetchCityDetail(slug: string): Promise<CityAirQualityDetail | null> {
-  const city = CITIES.find((c) => c.slug === slug);
+  const city = getCityBySlug(slug);
   if (!city) return null;
 
   // Air Quality: PM + NO2/SO2/CO, 7일 과거 + 7일 예보
@@ -200,7 +190,7 @@ export async function fetchCityHistory(
   slug: string,
   pastDays: number
 ): Promise<DailyAirQuality[]> {
-  const city = CITIES.find((c) => c.slug === slug);
+  const city = getCityBySlug(slug);
   if (!city) return [];
 
   const url = `${BASE_URL}?latitude=${city.lat}&longitude=${city.lon}&hourly=pm10,pm2_5&timezone=Asia/Seoul&past_days=${pastDays}&forecast_days=0`;

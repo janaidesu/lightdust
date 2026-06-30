@@ -1,6 +1,7 @@
 import { DailyAirQuality } from '@/lib/types';
 import { formatDateKorean } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface DailyTableProps {
   data: DailyAirQuality[];
@@ -8,11 +9,7 @@ interface DailyTableProps {
 
 export default function DailyTable({ data }: DailyTableProps) {
   if (data.length === 0) {
-    return (
-      <div className="text-center text-gray-400 py-12">
-        날짜별 데이터가 없습니다.
-      </div>
-    );
+    return <EmptyState message="날짜별 데이터가 없습니다." />;
   }
 
   return (

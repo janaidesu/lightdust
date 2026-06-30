@@ -1,6 +1,7 @@
 import { DailyAirQuality, WeatherData, AirQualityHourly, VisualFactorResult } from '@/lib/types';
-import { generatePrediction, calculateAccuracy } from '@/lib/utils';
+import { generatePrediction, calculateAccuracy, formatFactorPercent, getFactorColorClass } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
+import EmptyState from '@/components/ui/EmptyState';
 import HazinessMeter from './HazinessMeter';
 
 interface PredictionSummaryProps {
@@ -65,11 +66,7 @@ export default function PredictionSummary({ today, forecast, history, weather, t
   const accuracy = calculateAccuracy(history, forecast);
 
   if (!prediction) {
-    return (
-      <div className="text-center text-gray-400 py-12">
-        예측 데이터가 충분하지 않습니다.
-      </div>
-    );
+    return <EmptyState message="예측 데이터가 충분하지 않습니다." />;
   }
 
   const trendArrow = prediction.trend === 'worsening' ? '↑' : prediction.trend === 'improving' ? '↓' : '→';
@@ -131,11 +128,8 @@ export default function PredictionSummary({ today, forecast, history, weather, t
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gray-600">종합 보정 계수</span>
-              <span className={`text-lg font-bold ${
-                prediction.chinaFactor.combinedFactor > 1.1 ? 'text-red-500' :
-                prediction.chinaFactor.combinedFactor < 0.9 ? 'text-blue-500' : 'text-gray-700'
-              }`}>
-                {prediction.chinaFactor.combinedFactor > 1 ? '+' : ''}{Math.round((prediction.chinaFactor.combinedFactor - 1) * 100)}%
+              <span className={`text-lg font-bold ${getFactorColorClass(prediction.chinaFactor.combinedFactor, 1.1, 0.9)}`}>
+                {formatFactorPercent(prediction.chinaFactor.combinedFactor)}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -181,10 +175,7 @@ export default function PredictionSummary({ today, forecast, history, weather, t
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <span className="text-gray-500 text-xs block mb-1">대기 안정도</span>
-              <span className={`font-medium ${
-                prediction.weatherFactors.stabilityFactor > 1.15 ? 'text-red-500' :
-                prediction.weatherFactors.stabilityFactor < 0.85 ? 'text-blue-500' : ''
-              }`}>
+              <span className={`font-medium ${getFactorColorClass(prediction.weatherFactors.stabilityFactor, 1.15, 0.85)}`}>
                 {prediction.weatherFactors.stabilityFactor > 1.15 ? '정체 우려' :
                  prediction.weatherFactors.stabilityFactor < 0.85 ? '분산 양호' : '보통'}
                 {' '}(x{prediction.weatherFactors.stabilityFactor})
@@ -200,10 +191,7 @@ export default function PredictionSummary({ today, forecast, history, weather, t
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <span className="text-gray-500 text-xs block mb-1">오염물질 추세</span>
-              <span className={`font-medium ${
-                prediction.weatherFactors.leadingIndicatorFactor > 1.05 ? 'text-red-500' :
-                prediction.weatherFactors.leadingIndicatorFactor < 0.95 ? 'text-blue-500' : ''
-              }`}>
+              <span className={`font-medium ${getFactorColorClass(prediction.weatherFactors.leadingIndicatorFactor)}`}>
                 {prediction.weatherFactors.leadingIndicatorFactor > 1.1 ? '급증 신호' :
                  prediction.weatherFactors.leadingIndicatorFactor > 1.05 ? '증가 추세' :
                  prediction.weatherFactors.leadingIndicatorFactor < 0.95 ? '감소 추세' : '안정'}
@@ -229,11 +217,8 @@ export default function PredictionSummary({ today, forecast, history, weather, t
             </div>
             <div className="bg-gray-50 rounded-lg p-3">
               <span className="text-gray-500 text-xs block mb-1">보정 계수</span>
-              <span className={`text-lg font-bold ${
-                prediction.visualFactor.combinedFactor > 1.05 ? 'text-red-500' :
-                prediction.visualFactor.combinedFactor < 0.95 ? 'text-blue-500' : 'text-gray-700'
-              }`}>
-                {prediction.visualFactor.combinedFactor > 1 ? '+' : ''}{Math.round((prediction.visualFactor.combinedFactor - 1) * 100)}%
+              <span className={`text-lg font-bold ${getFactorColorClass(prediction.visualFactor.combinedFactor)}`}>
+                {formatFactorPercent(prediction.visualFactor.combinedFactor)}
               </span>
             </div>
           </div>

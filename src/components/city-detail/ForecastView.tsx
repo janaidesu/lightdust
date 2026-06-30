@@ -1,6 +1,7 @@
 import { DailyAirQuality } from '@/lib/types';
 import { formatDateShort } from '@/lib/utils';
 import GradeBadge from '@/components/ui/GradeBadge';
+import EmptyState from '@/components/ui/EmptyState';
 import { format } from 'date-fns';
 
 interface ForecastViewProps {
@@ -9,11 +10,7 @@ interface ForecastViewProps {
 
 export default function ForecastView({ data }: ForecastViewProps) {
   if (data.length === 0) {
-    return (
-      <div className="text-center text-gray-400 py-12">
-        예보 데이터가 없습니다.
-      </div>
-    );
+    return <EmptyState message="예보 데이터가 없습니다." />;
   }
 
   const today = format(new Date(), 'yyyy-MM-dd');
