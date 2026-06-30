@@ -13,6 +13,16 @@ import {
 } from 'recharts';
 import { DailyAirQuality } from '@/lib/types';
 import { formatDateShort } from '@/lib/utils';
+import {
+  CHART_AXIS_TICK,
+  CHART_GRID_PROPS,
+  CHART_TOOLTIP_STYLE,
+  CHART_LEGEND_STYLE,
+  CHART_MARGIN,
+  PM25_CHART_COLOR,
+  PM10_CHART_COLOR,
+  formatChartTooltip,
+} from '@/lib/chart-config';
 
 interface HistoryViewProps {
   slug: string;
@@ -92,36 +102,32 @@ export default function HistoryView({ slug, initialData }: HistoryViewProps) {
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <div className="w-full h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <AreaChart data={chartData} margin={CHART_MARGIN}>
+                <CartesianGrid {...CHART_GRID_PROPS} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 11, fill: '#9CA3AF' }}
+                  tick={CHART_AXIS_TICK}
                   interval="preserveStartEnd"
                 />
-                <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} />
+                <YAxis tick={CHART_AXIS_TICK} />
                 <Tooltip
-                  contentStyle={{
-                    borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    fontSize: '13px',
-                  }}
-                  formatter={(value?: number, name?: string) => [`${value ?? 0} ug/m3`, name ?? '']}
+                  contentStyle={CHART_TOOLTIP_STYLE}
+                  formatter={formatChartTooltip}
                 />
-                <Legend wrapperStyle={{ fontSize: '12px' }} />
+                <Legend wrapperStyle={CHART_LEGEND_STYLE} />
                 <Area
                   type="monotone"
                   dataKey="PM2.5"
-                  stroke="#6366F1"
-                  fill="#6366F1"
+                  stroke={PM25_CHART_COLOR}
+                  fill={PM25_CHART_COLOR}
                   fillOpacity={0.1}
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
                   dataKey="PM10"
-                  stroke="#F97316"
-                  fill="#F97316"
+                  stroke={PM10_CHART_COLOR}
+                  fill={PM10_CHART_COLOR}
                   fillOpacity={0.1}
                   strokeWidth={2}
                 />

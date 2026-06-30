@@ -9,6 +9,7 @@
  */
 
 import type { VisualAnalysisResult, VisualFactorResult } from './types';
+import { round2, clamp } from './utils';
 
 export function calculateVisualFactor(
   analyses: VisualAnalysisResult[]
@@ -51,7 +52,7 @@ export function calculateVisualFactor(
   // 영향력 감쇠 (0.3): 시각 분석은 보조적 역할
   const influence = 0.3;
   factor = 1.0 + (factor - 1.0) * influence;
-  factor = Math.max(0.9, Math.min(1.15, factor));
+  factor = clamp(factor, 0.9, 1.15);
 
   let summary: string;
   if (avgHaziness < 0.3) summary = 'CCTV 시야 양호 (맑은 대기)';
@@ -60,8 +61,8 @@ export function calculateVisualFactor(
   else summary = 'CCTV 심한 미세먼지/안개 감지';
 
   return {
-    combinedFactor: Math.round(factor * 100) / 100,
-    haziness: Math.round(avgHaziness * 100) / 100,
+    combinedFactor: round2(factor),
+    haziness: round2(avgHaziness),
     cameraCount: reliable.length,
     summary,
     analyses,

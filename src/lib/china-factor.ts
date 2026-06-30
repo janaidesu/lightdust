@@ -10,6 +10,8 @@
  * 4. 풍향+풍속: 서풍/북서풍 + 풍속에 따른 이송 효과
  */
 
+import { round2, buildFactorSummary } from './utils';
+
 // --- 1. 요일 기반 공장 가동 패턴 ---
 
 const WEEKDAY_FACTORY_RATE: Record<number, number> = {
@@ -199,7 +201,7 @@ export function getWindFactor(
     }
   }
 
-  const factor = Math.round(dirFactor * speedMultiplier * 100) / 100;
+  const factor = round2(dirFactor * speedMultiplier);
 
   // 풍속 정보를 설명에 추가
   let speedDesc = '';
@@ -243,13 +245,11 @@ export function calculateChinaFactor(
   if (holidayName) factors.push(`${holidayName} 연휴 (공장 감소)`);
   if (weekdayRate < 0.5) factors.push('주말 공장 가동 감소');
 
-  const summary = factors.length > 0
-    ? factors.join(', ')
-    : '특별한 보정 요인 없음';
+  const summary = buildFactorSummary(factors, '특별한 보정 요인 없음');
 
   return {
-    combinedFactor: Math.round(combined * 100) / 100,
-    weekdayRate: Math.round(weekdayRate * 100) / 100,
+    combinedFactor: round2(combined),
+    weekdayRate: round2(weekdayRate),
     seasonalFactor: seasonal,
     windFactor: wind,
     windDescription: windDesc,

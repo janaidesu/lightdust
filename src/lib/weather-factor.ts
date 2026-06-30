@@ -11,6 +11,7 @@
  */
 
 import type { WeatherData, AirQualityHourly } from './types';
+import { round2, clamp, buildFactorSummary } from './utils';
 
 // --- 1. 강수 세정 효과 ---
 
@@ -65,7 +66,7 @@ export function getStabilityFactor(weather: WeatherData): { factor: number; desc
   else if (pressureMsl > 1020) stabilityScore += 0.05;
 
   // 0~1 범위로 클램핑
-  stabilityScore = Math.max(0, Math.min(1, stabilityScore));
+  stabilityScore = clamp(stabilityScore, 0, 1);
 
   // factor: 0.7(불안정) ~ 1.3(매우 안정)
   const factor = 0.7 + stabilityScore * 0.6;
@@ -75,7 +76,7 @@ export function getStabilityFactor(weather: WeatherData): { factor: number; desc
   else if (stabilityScore > 0.3) description = '대기 보통 안정';
   else description = '대기 불안정 (분산 양호)';
 
-  return { factor: Math.round(factor * 100) / 100, description };
+  return { factor: round2(factor), description };
 }
 
 // --- 3. 습도 보정 (Hygroscopic Growth) ---
@@ -90,7 +91,7 @@ export function getHumidityFactor(weather: WeatherData): { factor: number; descr
     // 70~85% 구간: 선형 보간
     const extra = (humidity - 70) * 0.02;
     return {
-      factor: Math.round((1.0 + extra) * 100) / 100,
+      factor: round2(1.0 + extra),
       description: '다소 높은 습도',
     };
   }
@@ -194,9 +195,10 @@ export function calculateWeatherFactor(
   // - 습도: 곱셈 (입자 크기 변화)
   // - 선행지표: 곱셈 (추세 반영)
   // 안전 범위: [0.3, 2.0]
-  const combined = Math.max(0.3, Math.min(2.0,
-    precip.factor * stability.factor * humidity.factor * leading.factor
-  ));
+  const combined = clamp(
+    precip.factor * stability.factor * humidity.factor * leading.factor,
+    0.3, 2.0
+  );
 
   // 요약 생성
   const factors: string[] = [];
@@ -207,12 +209,10 @@ export function calculateWeatherFactor(
   if (leading.factor > 1.05) factors.push(leading.description);
   else if (leading.factor < 0.95) factors.push(leading.description);
 
-  const summary = factors.length > 0
-    ? factors.join(', ')
-    : '특별한 기상 보정 없음';
+  const summary = buildFactorSummary(factors, '특별한 기상 보정 없음');
 
   return {
-    combinedFactor: Math.round(combined * 100) / 100,
+    combinedFactor: round2(combined),
     precipitationFactor: precip.factor,
     precipitationDesc: precip.description,
     stabilityFactor: stability.factor,
